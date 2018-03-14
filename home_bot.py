@@ -222,27 +222,27 @@ class CP:
 def plain_text(bot, update):
     bot.sendChatAction(chat_id=update.message.chat_id,
                        action=ChatAction.TYPING)
+    output = ""
     try:
         with open('cache/cp_' + str(update.message.chat_id), 'rb') as cache:
             movies = pickle.load(cache)
     except OSError:
-        error = u"Нет закэшированных результатов поиска"
-        output = error
-        movies = False
+        output = "Нет закэшированных результатов поиска"
+        movies = ()
     if movies:
         movie_title = update.message.text[:-5]
         movie_year = int(update.message.text[-4:])
         for entry in movies:
             if movie_title in entry['titles'] and movie_year == entry['year']:
-                logger.info('Фильм ' + movie_title + ': ' +
-                            str(movie_year) + ' найден, пробуем добавить в CP')
+                logger.info("Фильм %s: %s найден, пробуем добавить в CouchPotato" %
+                            (movie_title, str(movie_year)))
                 output = add_movie(movie_title, entry['imdb'])
-    else:
 
-    bot.sendMessage(chat_id=update.message.chat_id,
-                    text=output,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=ReplyKeyboardRemove())
+    # FIXME: output still can be None. "" also isn't good for send_message's text parameter.
+    bot.send_message(chat_id=update.message.chat_id,
+                     text=output if output else "None",
+                     parse_mode=ParseMode.HTML,
+                     reply_markup=ReplyKeyboardRemove())
 
 
 def add_movie(movie_title, movie_id):
