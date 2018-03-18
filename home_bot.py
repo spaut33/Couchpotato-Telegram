@@ -2,19 +2,20 @@
 # -*- coding: utf-8 -*-
 
 import logging
-import subprocess
-import re
-import platform
 import pickle
+import platform
+import re
+import subprocess
 from datetime import datetime, date, time
 from functools import wraps
-from telegram.ext import Updater, CommandHandler, MessageHandler
-from telegram.ext import BaseFilter, Filters, CallbackQueryHandler
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram import ChatAction, ParseMode, KeyboardButton
-from settings import Settings
 
+from telegram import ChatAction, ParseMode, KeyboardButton
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram.ext import BaseFilter, Filters, CallbackQueryHandler
+from telegram.ext import Updater, CommandHandler, MessageHandler
+
+from settings import Settings
 
 # Logging Configuration
 logging.basicConfig(
@@ -153,46 +154,49 @@ class CP:
 
     @restricted
     def query(bot, update):
+
         bot.sendChatAction(chat_id=update.message.chat_id,
                            action=ChatAction.TYPING)
-        result = CP.api_request('search', '?q=' + update.message.text[3:])
-        logger.info(
-            u"Couchpotato получает список фильмов по запросу: " +
-            update.message.text[3:])
-        if 'movies' in result:
+        result = CP.api_request("search", "?q=" + update.message.text[3:])
+        logger.info("Couchpotato получает список фильмов по запросу: " + update.message.text[3:])
+
+        if "movies" in result:
             button_list = []
-            film_list = ''
-            n = 1
+            film_list = ""
+            number = 1
             for entry in result['movies']:
-                year = entry['year']
-                imdb_rating = entry['rating']['imdb'][0]
-                imdb_votes = entry['rating']['imdb'][1]
-                href = '<a href="http://imdb.com/title/' + \
-                    entry['imdb'] + '/">'
-                film_list += str(n) + '. '
-                film_list += href + entry['titles'][0] + '</a> '
-                film_list += str(year) + ' '
-                film_list += '<i>' + str(imdb_rating)
-                film_list += '/' + str(imdb_votes) + '</i>\n'
-                button_text = entry['titles'][0] + ' ' + str(year)
-                button_list.append(KeyboardButton(text=button_text))
-                n = n + 1
-                logger.info(u"Couchpotato нашла кандидата: " +
-                            entry['titles'][0] + " IMDB ID:" + entry['imdb'])
-            with open('cache/cp_' +
-                      str(update.message.chat_id), 'wb') as cache:
+                try:
+                    year = entry["year"] if "year" in entry else "Unknown year"
+                    imdb_rating = "\n"
+                    if "rating" in entry:
+                        imdb_rating = "<i>%s/%s</i>\n" % (entry['rating']['imdb'][0],
+                                                          entry['rating']['imdb'][1])
+
+                    href = "<a href=\"http://imdb.com/title/%s/\">" % entry["imdb"]
+
+                    film_list += str(number) + ". "
+                    film_list += href + entry["titles"][0] + "</a> " + str(year) + " "
+                    film_list += imdb_rating
+                    button_text = entry["titles"][0] + " " + str(year)
+                    button_list.append(KeyboardButton(text=button_text))
+                    number += 1
+                    logger.info("CouchPotato нашла кандидата: " +
+                                entry['titles'][0] + " IMDB ID: " + entry['imdb'])
+                except KeyError:
+                    logger.warning("Missing fields in entry: %s" % entry)
+
+            with open("cache/cp_" + str(update.message.chat_id), "wb") as cache:
                 pickle.dump(result['movies'], cache)
-            output = u"<b>Найдены следующие фильмы:</b>" + '\n' + film_list
-            reply_markup = ReplyKeyboardMarkup(build_menu(button_list,
-                                                          n_cols=1
-                                                          ))
+            output = "<b>Найдены следующие фильмы:</b>\n" + film_list
+            reply_markup = ReplyKeyboardMarkup(build_menu(button_list, n_cols=1))
+
             bot.sendMessage(chat_id=update.message.chat_id,
-                            text=output, reply_markup=reply_markup,
+                            text=output,
+                            reply_markup=reply_markup,
                             parse_mode=ParseMode.HTML)
         else:
-            output = u"Ничего не нашлось. Попробуйте другой вариант названия."
-            bot.sendMessage(chat_id=update.message.chat_id,
-                            text=output)
+            output = "Ничего не нашлось. Попробуйте другой вариант названия."
+            bot.sendMessage(chat_id=update.message.chat_id, text=output)
 
     def api_request(action, query):
         import requests
